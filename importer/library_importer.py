@@ -51,5 +51,5 @@ def main():
             # add to located roms dict
             located_roms.get(rom.system).append(file.name)
 
-if __name__ == "__main__":
+i __name__ == "__main__":
     main()
