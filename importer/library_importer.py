@@ -1,55 +1,110 @@
 from dataclasses import dataclass # more convenient than standard classes for roms
 from pathlib import Path # makes file/folder i/o more convenient
 import sys # for CL i/o
-#import Taskiq # for async database updates
 
-# TODO: add more systems and add name variations
-RECOGNIZED_SYSTEMS = {
-    '.gba': 'gba',
-    '.gbc': 'gbc',
-    '.nes': 'nes',
-    '.sfc': 'snes',
-    '.smc': 'snes',
-    '.nds': 'nds',
-    '.rvz': 'gc',
-    '.iso': 'variable',
-    '.chd': 'variable'
+RECOGNIZED_EXTENSIONS = {
+    '.gb': 'Game Boy',
+    '.gbc': 'Game Boy Color',
+    '.gba': 'Game Boy Advance',
+    '.nes': 'Nintendo Entertainment System',
+    '.nez': 'Nintendo Entertainment System',
+    '.sfc': 'Super Nintendo Entertainment System',
+    '.smc': 'Super Nintendo Entertainment System',
+    '.nds': 'Nintendo DS',
+    '.srl': 'Nintendo DS',
+    '.cia': 'Nintendo 3DS',
+    '.3ds': 'Nintendo 3DS',
+    '.dsi': 'DSiWare',
+    '.n64': 'Nintendo 64',
+    '.ndd': 'Nintendo 64',
+    '.z64': 'Nintendo 64',
+    '.v64': 'Nintendo 64',
+    '.rvz': 'GameCube',
+    '.gcm': 'GameCube',
+    '.gcz': 'GameCube',
+    '.nsp': 'Nintendo Switch',
+    '.xci': 'Nintendo Switch',
+    '.dnsp': 'Nintendo Switch',
+    '.dxci': 'Nintendo Switch',
+    '.xiso': 'Xbox',
+    '.cdi': 'Dreamcast',
+    '.sms': 'Sega Master System',
+    '.gen': 'Sega Genesis',
+    '.md': 'Sega Genesis',
+    '.gen': 'Sega Genesis',
+    '.wud': 'Wii U',
+    '.wux': 'Wii U',
+    '.wua': 'Wii U',
+    '.vpk': "Playstation Vita",
+    '.apk': 'Android',
+    '.wad': 'variable', # Wii and DoomEngine games
+    '.cci': 'variable', # Xbox disc image and citra-based 3ds
+    '.rvz': 'variable', # GC and Wii
+    '.gcz': 'variable', # GC and Wii
+    '.iso': 'variable', # Many systems
+    '.chd': 'variable' # Many systems
+    
 }
 
 @dataclass
+class System: # System data object
+    name: str
+    #manufacturer: str # need metadata scraping
+    #release_year: int # need metadata scraping
+    #TODO: add methods?
+
+@dataclass
+class Game: # Game data object
+    title: str
+    #region: str # need metadat scraping
+    #release_year: int # need metadata scraping
+    #sha256: str # need to build the hashing logic
+    #TODO: add methods?
+
+@dataclass
 class Rom: # ROM data object
-    filename: str
-    #region: str # no scraping yet
-    #release year: str # no scraping yet
-    system: str
+    game: Game
+    system: System
     filepath: Path
-    sha256: str # for duplicate control
+    #TODO: add methods?
 
 def main():
     print("Starting scanner...")
     
     # TODO: dynamic input
-    roms_directory = Path('~/Desktop/roms/').expanduser() # Rom directory location
+    roms_directory = Path('~/OneDrive/Desktop/bnkrDB/tests/importer_test_directory').expanduser() # Rom directory location
 
-    # TODO: Long term the roms don't need to be stored like this. Examine the
-    # directory, get the rom + info, and create a task for a Taskiq worker
-    # that handles all the data processing while the importer grabs the next item. 
-    # This way you can have multiple brokers updating the database in concert
-    # instead of one after the other. This is just proof of concept.
-    located_roms= {'nes': [], 'snes': [], 'gbc': [], 'gba': [], 'nds': [], 'variable': []}
+    located_roms= []
     
     for file in roms_directory.rglob('*'): # recursively search provided directory
-        extension = file.suffix # extract extension
-        if extension in RECOGNIZED_SYSTEMS: # verify if found file is a game from a recognized system
-            rom = Rom(
-                filename=file.name,
-                system=RECOGNIZED_SYSTEMS[extension],
-                filepath=file,
-                sha256='0'
-            ) # create rom data object
+        extension = file.suffix
+        if extension in RECOGNIZED_EXTENSIONS: 
+            if RECOGNIZED_EXTENSIONS[extension] == 'variable':
+                # TODO: handle file extensions that map to different systems
+                continue
+            else:
+                new_system = System(
+                    name=RECOGNIZED_EXTENSIONS[extension]
+                    #manufacturer=
+                    #release_year=
+                )
 
-            # add to located roms dict
-            located_roms.get(rom.system).append(file.name)
+                new_game = Game(
+                    title=file.name
+                    #region=
+                    #release_year=
+                    #sha256=
+                )
 
-i __name__ == "__main__":
+                rom = Rom(
+                    game=new_game,
+                    system=new_system,
+                    filepath=file,
+                )
+
+                located_roms.append(rom)
+
+    print(located_roms[0])
+
+if __name__ == "__main__":
     main()
