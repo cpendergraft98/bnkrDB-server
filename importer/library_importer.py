@@ -1,6 +1,6 @@
 from dataclasses import dataclass # more convenient than standard classes for roms
 from pathlib import Path # makes file/folder i/o more convenient
-import sys # for CL i/o
+import hashlib # for computing SHA-256 hash
 
 RECOGNIZED_EXTENSIONS = {
     '.gb': 'Game Boy',
@@ -58,7 +58,7 @@ class Game: # Game data object
     title: str
     #region: str # need metadat scraping
     #release_year: int # need metadata scraping
-    #sha256: str # need to build the hashing logic
+    sha256: str # need to build the hashing logic
     #TODO: add methods?
 
 @dataclass
@@ -83,28 +83,17 @@ def main():
                 # TODO: handle file extensions that map to different systems
                 continue
             else:
-                new_system = System(
-                    name=RECOGNIZED_EXTENSIONS[extension]
-                    #manufacturer=
-                    #release_year=
-                )
+                #hash rom file
+                with open(file, "rb") as f:
+                    digest = hashlib.file_digest(f, "sha256")
+                hash = digest.hexdigest()
 
-                new_game = Game(
-                    title=file.name
-                    #region=
-                    #release_year=
-                    #sha256=
-                )
-
-                rom = Rom(
-                    game=new_game,
-                    system=new_system,
-                    filepath=file,
-                )
+                #build data objects
+                new_system = System(name=RECOGNIZED_EXTENSIONS[extension])
+                new_game = Game(title = file.name, sha256=hash)      
+                rom = Rom(game=new_game, system=new_system, filepath=file)
 
                 located_roms.append(rom)
-
-    print(located_roms[0])
 
 if __name__ == "__main__":
     main()
