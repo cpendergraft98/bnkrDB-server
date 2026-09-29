@@ -1,6 +1,7 @@
-from dataclasses import dataclass # more convenient than standard classes for roms
 from pathlib import Path # makes file/folder i/o more convenient
 import hashlib # for computing SHA-256 hash
+import rom_dataclasses as rdc
+from metadata_scraper import hasheousSearch
 
 RECOGNIZED_EXTENSIONS = {
     '.gb': 'Game Boy',
@@ -46,28 +47,6 @@ RECOGNIZED_EXTENSIONS = {
     
 }
 
-@dataclass
-class System: # System data object
-    name: str
-    #manufacturer: str # need metadata scraping
-    #release_year: int # need metadata scraping
-    #TODO: add methods?
-
-@dataclass
-class Game: # Game data object
-    title: str
-    #region: str # need metadat scraping
-    #release_year: int # need metadata scraping
-    sha256: str # need to build the hashing logic
-    #TODO: add methods?
-
-@dataclass
-class Rom: # ROM data object
-    game: Game
-    system: System
-    filepath: Path
-    #TODO: add methods?
-
 def main():
     print("Starting scanner...")
     
@@ -84,16 +63,25 @@ def main():
                 continue
             else:
                 #hash rom file
+                sha256 = hashlib.sha256()
+                sha1 = hashlib.sha1()
                 with open(file, "rb") as f:
-                    digest = hashlib.file_digest(f, "sha256")
-                hash = digest.hexdigest()
+                    # loop allows for processing both SHA-256 and SHA-1 in a single pass
+                    while chunk := f.read(1024 * 1024): # you found the walrus!
+                        sha256.update(chunk)
+                        sha1.update(chunk)
+
+                hash256 = sha256.hexdigest()
+                hash1 = sha1.hexdigest()
 
                 #build data objects
-                new_system = System(name=RECOGNIZED_EXTENSIONS[extension])
-                new_game = Game(title = file.name, sha256=hash)      
-                rom = Rom(game=new_game, system=new_system, filepath=file)
+                new_system = rdc.System(name=RECOGNIZED_EXTENSIONS[extension])
+                new_game = rdc.Game(title = file.name, sha256=hash256, sha1=hash1)      
+                rom = rdc.Rom(game=new_game, system=new_system, filepath=file)
 
                 located_roms.append(rom)
+
+    hasheousSearch(located_roms[0])
 
 if __name__ == "__main__":
     main()
