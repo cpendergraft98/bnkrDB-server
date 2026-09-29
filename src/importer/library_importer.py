@@ -47,7 +47,7 @@ RECOGNIZED_EXTENSIONS = {
     
 }
 
-def main():
+def library_importer():
     print("Starting scanner...")
     
     # TODO: dynamic input
@@ -101,4 +101,4 @@ def main():
     print(located_roms[0])
 
 if __name__ == "__main__":
-    main()
+    library_importer()
