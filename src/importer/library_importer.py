@@ -51,7 +51,8 @@ def main():
     print("Starting scanner...")
     
     # TODO: dynamic input
-    roms_directory = Path('~/OneDrive/Desktop/bnkrDB/tests/importer_test_directory').expanduser() # Rom directory location
+    #roms_directory = Path('~/OneDrive/Desktop/bnkrDB/tests/importer_test_directory').expanduser() # Rom directory location
+    roms_directory = Path('~/Documents/projects/bnkrDB/local_tests/importer/sample_rom_directory').expanduser()
 
     located_roms= []
     
@@ -64,7 +65,7 @@ def main():
             else:
                 #hash rom file
                 sha256 = hashlib.sha256()
-                sha1 = hashlib.sha1()
+                sha1 = hashlib.sha1() # Used to search Hasheous
                 with open(file, "rb") as f:
                     # loop allows for processing both SHA-256 and SHA-1 in a single pass
                     while chunk := f.read(1024 * 1024): # you found the walrus!
@@ -74,14 +75,30 @@ def main():
                 hash256 = sha256.hexdigest()
                 hash1 = sha1.hexdigest()
 
+                metadata = hasheousSearch(hash1)
                 #build data objects
-                new_system = rdc.System(name=RECOGNIZED_EXTENSIONS[extension])
-                new_game = rdc.Game(title = file.name, sha256=hash256, sha1=hash1)      
-                rom = rdc.Rom(game=new_game, system=new_system, filepath=file)
+                new_system = rdc.System(
+                    name=RECOGNIZED_EXTENSIONS[extension]
+                )
+
+                new_game = rdc.Game(
+                    filename=file.name, 
+                    name=metadata['name'], 
+                    publisher=metadata['publisher'],
+                    regions=metadata['regions'],
+                    AIdescription=metadata['AIdescription'],
+                    release_year=metadata['release_year'], 
+                    sha256=hash256
+                ) 
+
+                rom = rdc.Rom(
+                    game=new_game, 
+                    system=new_system, 
+                    filepath=file)
 
                 located_roms.append(rom)
 
-    hasheousSearch(located_roms[0])
+    print(located_roms[0])
 
 if __name__ == "__main__":
     main()

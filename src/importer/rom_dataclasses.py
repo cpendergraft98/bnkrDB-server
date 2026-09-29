@@ -4,18 +4,22 @@ from pathlib import Path
 @dataclass
 class System: # System data object
     name: str
-    #manufacturer: str # need metadata scraping
-    #release_year: int # need metadata scraping
+    #manufacturer: str # need system metadata scraping
+    #release_year: int # need system metadata scraping
     #TODO: add methods?
+    #TODO: add defaults for if data is not found?
 
 @dataclass
 class Game: # Game data object
-    title: str
-    #region: str # need metadat scraping
-    #release_year: int # need metadata scraping
-    sha256: str # need to build the hashing logic
-    sha1: str # used for metadata extraction
+    filename: str
+    name: str
+    publisher: str
+    regions: dict 
+    AIdescription: str
+    release_year: str
+    sha256: str
     #TODO: add methods?
+    #TODO: add defaults for if data is not found?
 
 @dataclass
 class Rom: # ROM data object
