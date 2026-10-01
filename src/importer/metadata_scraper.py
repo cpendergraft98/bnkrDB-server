@@ -1,6 +1,6 @@
 # Uses hasheous and IGDB to collect text-based metadata for local storage
 import requests
-import os # for accessing .env if API is needed
+#import os # for accessing .env if API key is needed
 
 def hasheousSearch(sha1_hash: str) -> dict:
 
@@ -13,27 +13,21 @@ def hasheousSearch(sha1_hash: str) -> dict:
 
     # validate reponse
     if response.status_code != 200:
-        print(f"ERROR: Failed to post SHA-1 hash to Hasheous, possibly an unofficial ROM hack? STATUS CODE: {response.status_code}")
-        #return metadata object populated with defaults
+        print(f"WARNING: Failed to POST {sha1_hash} hash to Hasheous, possibly an unofficial ROM hack? STATUS CODE: {response.status_code}")
+        #return control command that tells importer to skip this entry
+        return None
+    
         #TODO: more elegant handling, redirect to a function that checks if it is a ROM hack or a broken entry
-        metadata = {
-            'name': 'Failed to retrieve metadata, posibly an unofficial ROM hack? STATUS_CODE_400',
-            'publisher': 'Failed to retrieve metadata, possibly an unofficial ROM hack? STATUS_CODE_400',
-            'regions': {'Failed to retrieve metadata, possibly an unofficial ROM hack? STATUS_CODE_400': 'N/A'},
-            'AIdescription': 'Failed to retrieve metadata, possibly an unofficial ROM hack? STATUS_CODE_400',
-            "release_year": 'Failed to retrieve metadata, possibly an unofficial ROM hack? STATUS_CODE_400'
-        }
+        
     else:
         data = response.json()
 
-        #package response data
+        #prepare response data
         #TODO: handling for blank metadata. Dataclass defaults?
         game = data['signature']['game']
         metadata = {
             'name': game['name'],
             'publisher': game['publisher'],
-            'regions': game['countries'],
-            'AIdescription': 'temp', #TODO: figure out proper index
             'release_year': game['year']
         }
 

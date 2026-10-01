@@ -2,60 +2,78 @@ from pathlib import Path # makes file/folder i/o more convenient
 import hashlib # for computing SHA-256 hash
 import rom_dataclasses as rdc
 from metadata_scraper import hasheousSearch
+import sqlite3
+from recognized_extensions import RECOGNIZED_EXTENSIONS
 
-RECOGNIZED_EXTENSIONS = {
-    '.gb': 'Game Boy',
-    '.gbc': 'Game Boy Color',
-    '.gba': 'Game Boy Advance',
-    '.nes': 'Nintendo Entertainment System',
-    '.nez': 'Nintendo Entertainment System',
-    '.sfc': 'Super Nintendo Entertainment System',
-    '.smc': 'Super Nintendo Entertainment System',
-    '.nds': 'Nintendo DS',
-    '.srl': 'Nintendo DS',
-    '.cia': 'Nintendo 3DS',
-    '.3ds': 'Nintendo 3DS',
-    '.dsi': 'DSiWare',
-    '.n64': 'Nintendo 64',
-    '.ndd': 'Nintendo 64',
-    '.z64': 'Nintendo 64',
-    '.v64': 'Nintendo 64',
-    '.rvz': 'GameCube',
-    '.gcm': 'GameCube',
-    '.gcz': 'GameCube',
-    '.nsp': 'Nintendo Switch',
-    '.xci': 'Nintendo Switch',
-    '.dnsp': 'Nintendo Switch',
-    '.dxci': 'Nintendo Switch',
-    '.xiso': 'Xbox',
-    '.cdi': 'Dreamcast',
-    '.sms': 'Sega Master System',
-    '.gen': 'Sega Genesis',
-    '.md': 'Sega Genesis',
-    '.gen': 'Sega Genesis',
-    '.wud': 'Wii U',
-    '.wux': 'Wii U',
-    '.wua': 'Wii U',
-    '.vpk': "Playstation Vita",
-    '.apk': 'Android',
-    '.wad': 'variable', # Wii and DoomEngine games
-    '.cci': 'variable', # Xbox disc image and citra-based 3ds
-    '.rvz': 'variable', # GC and Wii
-    '.gcz': 'variable', # GC and Wii
-    '.iso': 'variable', # Many systems
-    '.chd': 'variable' # Many systems
-    
-}
+def buildDatabase(cursor: sqlite3.Cursor)->None:
+    # build database in-placE
 
-def library_importer():
+    # user table
+    cursor.execute("""
+        CREATE TABLE Users(
+            UserID INTEGER PRIMARY KEY,
+            UserName TEXT UNIQUE,
+            PasswdHash TEXT NOT NULL
+        )
+    """)
+
+    # system table
+    cursor.execute("""
+        CREATE TABLE Systems(
+            SystemID INTEGER PRIMARY KEY,
+            SystemName TEXT UNIQUE,
+            Manufacturer TEXT,
+            SysRlsYr TEXT
+        )
+    """)
+
+    # game table
+    cursor.execute("""
+        CREATE TABLE Games(
+            GameID INTEGER PRIMARY KEY,
+            SystemID INTEGER,
+            Filename TEXT NOT NULL,
+            GameName TEXT NOT NULL,
+            Path TEXT NOT NULL,
+            SHA256 TEXT UNIQUE,
+            Publisher TEXT,
+            GameRlsYr TEXT,
+            CONSTRAINT fk_Systems
+            FOREIGN KEY (SystemID)
+            REFERENCES Systems(SystemID)
+        )
+    """)
+
+    # favorites table
+    cursor.execute("""
+        CREATE TABLE Favorites(
+            UserID INTEGER,
+            GameID INTEGER,
+            CONSTRAINT fk_Users
+            FOREIGN KEY (UserID)
+            REFERENCES Users(UserID)
+            CONSTRAINT fk_Games
+            FOREIGN KEY (GameID)
+            REFERENCES Games(GameID)
+        )
+    """)
+
+
+def romImporter(romDirectoryPath: str)->None:
     print("Starting scanner...")
     
-    # TODO: dynamic input
-    #roms_directory = Path('~/OneDrive/Desktop/bnkrDB/tests/importer_test_directory').expanduser() # Rom directory location
-    roms_directory = Path('~/Documents/projects/bnkrDB/local_tests/importer/sample_rom_directory').expanduser()
+    roms_directory = Path(romDirectoryPath).expanduser() # Rom directory location
 
-    located_roms= []
-    
+    # create/connect to database
+    connection = sqlite3.connect("./src/server/bnkr.db")
+    cursor = connection.cursor()
+
+    # determine if the database has been built prior
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+
+    if cursor.fetchone() is None: # first-time creation of the db
+        buildDatabase(cursor)
+
     for file in roms_directory.rglob('*'): # recursively search provided directory
         extension = file.suffix
         if extension in RECOGNIZED_EXTENSIONS: 
@@ -65,7 +83,7 @@ def library_importer():
             else:
                 #hash rom file
                 sha256 = hashlib.sha256()
-                sha1 = hashlib.sha1() # Used to search Hasheous
+                sha1 = hashlib.sha1() # used to search Hasheous
                 with open(file, "rb") as f:
                     # loop allows for processing both SHA-256 and SHA-1 in a single pass
                     while chunk := f.read(1024 * 1024): # you found the walrus!
@@ -76,29 +94,39 @@ def library_importer():
                 hash1 = sha1.hexdigest()
 
                 metadata = hasheousSearch(hash1)
-                #build data objects
-                new_system = rdc.System(
-                    name=RECOGNIZED_EXTENSIONS[extension]
-                )
 
-                new_game = rdc.Game(
-                    filename=file.name, 
-                    name=metadata['name'], 
-                    publisher=metadata['publisher'],
-                    regions=metadata['regions'],
-                    AIdescription=metadata['AIdescription'],
-                    release_year=metadata['release_year'], 
-                    sha256=hash256
-                ) 
+                # if metadata is nonetype then Hasheous returned 404
+                if metadata != None:
 
-                rom = rdc.Rom(
-                    game=new_game, 
-                    system=new_system, 
-                    filepath=file)
+                    # Game entry data
+                    cursor.execute("SELECT * FROM Games") #determines ID
+                    gameIndex = len(cursor.fetchall())
+                    filename = file.name
+                    gameName = metadata['name']
+                    publisher = metadata['publisher']
+                    rlsYr = metadata['release_year']
 
-                located_roms.append(rom)
+                    #TODO: Create a function to check for duplicates in game table based off SHA256
 
-    print(located_roms[0])
+                    # system entry data
+                    cursor.execute('SELECT SystemName FROM Systems') #determines ID
+                    existing_names = cursor.fetchall()
+                    sysIndex = len(existing_names)
+                    systemName = RECOGNIZED_EXTENSIONS[extension]
+
+                    print(existing_names)
+                    print(systemName)
+                    #AHHHHHHHHHHHHHHHHHHHHHHHH
+                    if systemName not in existing_names: # System hasn't been entered into database
+                        cursor.execute("INSERT INTO Systems (SystemID, SystemName) Values(?, ?)", [sysIndex, systemName])
+                    else: # System exists in database, extract id for game entry
+                        cursor.execute("SELECT SystemID FROM Systems WHERE SystemName=?", systemName)
+                        sysIndex = cursor.fetchone()
+
+                    cursor.execute("INSERT INTO Games (GameId, SystemId, Filename, GameName, Path, SHA256, Publisher, GameRlsYr) VALUES(?, ?, ?, ?, ?, ?, ?, ?)""",
+                                [gameIndex, sysIndex, filename, gameName, str(file), hash256, publisher, rlsYr]
+                        )
+    connection.close()
 
 if __name__ == "__main__":
-    library_importer()
+    romImporter("C:/Users/cpend/OneDrive/Desktop/bnkrDB/tests/importer_test_directory")
