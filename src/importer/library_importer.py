@@ -4,6 +4,10 @@ import rom_dataclasses as rdc
 from metadata_scraper import hasheousSearch
 import sqlite3
 from recognized_extensions import RECOGNIZED_EXTENSIONS
+from dotenv import load_dotenv
+import os
+
+load_dotenv() #load environment variables
 
 def buildDatabase(cursor: sqlite3.Cursor)->None:
     # build database in-placE
@@ -58,6 +62,13 @@ def buildDatabase(cursor: sqlite3.Cursor)->None:
         )
     """)
 
+def checkForDuplicateGame(gameHash: str, cursor: sqlite3.Cursor)-> bool:
+    # Extract existing hashes from game table
+    cursor.execute("SELECT SHA256 FROM Games")
+    fetched = cursor.fetchall()
+    hashes = [fetched[i][0] for i in range(len(fetched))] # list of existing hashes
+
+    return (gameHash) in hashes
 
 def romImporter(romDirectoryPath: str)->None:
     print("Starting scanner...")
@@ -91,42 +102,45 @@ def romImporter(romDirectoryPath: str)->None:
                         sha1.update(chunk)
 
                 hash256 = sha256.hexdigest()
-                hash1 = sha1.hexdigest()
+                if not checkForDuplicateGame(hash256, cursor): # check for duplicate game
+                    hash1 = sha1.hexdigest()
 
-                metadata = hasheousSearch(hash1)
+                    metadata = hasheousSearch(hash1)
 
-                # if metadata is nonetype then Hasheous returned 404
-                if metadata != None:
+                    # if metadata is nonetype then Hasheous returned 404
+                    if metadata != None:
 
-                    # Game entry data
-                    cursor.execute("SELECT * FROM Games") #determines ID
-                    gameIndex = len(cursor.fetchall())
-                    filename = file.name
-                    gameName = metadata['name']
-                    publisher = metadata['publisher']
-                    rlsYr = metadata['release_year']
+                        # Game entry data
+                        cursor.execute("SELECT * FROM Games") #determines ID
+                        gameIndex = len(cursor.fetchall())
+                        filename = file.name
+                        gameName = metadata['name']
+                        publisher = metadata['publisher']
+                        rlsYr = metadata['release_year']
 
-                    #TODO: Create a function to check for duplicates in game table based off SHA256
+                        #TODO: Create a function to check for duplicates in game table based off SHA256
 
-                    # system entry data
-                    cursor.execute('SELECT SystemName FROM Systems') #determines ID
-                    existing_names = cursor.fetchall()
-                    sysIndex = len(existing_names)
-                    systemName = RECOGNIZED_EXTENSIONS[extension]
+                        # system entry data
+                        cursor.execute('SELECT SystemName FROM Systems') #determines ID
+                        existing_names = cursor.fetchall()
+                        sysIndex = len(existing_names)
+                        systemName = RECOGNIZED_EXTENSIONS[extension]
+                        systemNameTuple = (systemName,) # existing_names stores Tuples
 
-                    print(existing_names)
-                    print(systemName)
-                    #AHHHHHHHHHHHHHHHHHHHHHHHH
-                    if systemName not in existing_names: # System hasn't been entered into database
-                        cursor.execute("INSERT INTO Systems (SystemID, SystemName) Values(?, ?)", [sysIndex, systemName])
-                    else: # System exists in database, extract id for game entry
-                        cursor.execute("SELECT SystemID FROM Systems WHERE SystemName=?", systemName)
-                        sysIndex = cursor.fetchone()
+                        if systemNameTuple not in existing_names: # System hasn't been entered into database
+                            cursor.execute("INSERT INTO Systems (SystemID, SystemName) Values(?, ?)", (sysIndex, systemName,))
+                        else: # System exists in database, extract id for game entry
+                            cursor.execute("SELECT SystemID FROM Systems WHERE SystemName=(?)", (systemName,))
+                            sysIndex = cursor.fetchone()[0] # fetchone returns a tuple, extract the index
 
-                    cursor.execute("INSERT INTO Games (GameId, SystemId, Filename, GameName, Path, SHA256, Publisher, GameRlsYr) VALUES(?, ?, ?, ?, ?, ?, ?, ?)""",
-                                [gameIndex, sysIndex, filename, gameName, str(file), hash256, publisher, rlsYr]
-                        )
+                        cursor.execute("INSERT INTO Games (GameId, SystemId, Filename, GameName, Path, SHA256, Publisher, GameRlsYr) VALUES(?, ?, ?, ?, ?, ?, ?, ?)""",
+                                    (gameIndex, sysIndex, filename, gameName, str(file), hash256, publisher, rlsYr,)
+                            )
+                        connection.commit()
+                else:
+                    print("Duplicate game identified. Skipping....")
     connection.close()
 
 if __name__ == "__main__":
-    romImporter("C:/Users/cpend/OneDrive/Desktop/bnkrDB/tests/importer_test_directory")
+    #TODO: Standardize filepath format for storage? SHould be linux if server runs linux
+    romImporter(os.getenv("LINUX_PATH"))
