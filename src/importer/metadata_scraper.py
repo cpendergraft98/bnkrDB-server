@@ -24,11 +24,11 @@ def hasheousSearch(sha1_hash: str) -> dict:
 
         #prepare response data
         #TODO: handling for blank metadata. Dataclass defaults?
-        game = data['signature']['game']
         metadata = {
-            'name': game['name'],
-            'publisher': game['publisher'],
-            'release_year': game['year']
+            'name': data['name'],
+            'publisher': data['signature']['game']['publisher'],
+            'release_year': data['signature']['game']['year'],
+            'platform': data['platform']['name']
         }
 
     return metadata

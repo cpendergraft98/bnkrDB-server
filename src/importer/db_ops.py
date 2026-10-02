@@ -1,5 +1,5 @@
 import sqlite3
-import rom_dataclasses as rdc
+import bnkr_dataclasses as bdc
 
 def buildDatabase(cursor: sqlite3.Cursor)->None:
     # build database in-placE
@@ -54,7 +54,7 @@ def buildDatabase(cursor: sqlite3.Cursor)->None:
         )
     """)
 
-def checkDuplicateSystem(system: rdc.System, cursor: sqlite3.Cursor)->bool:
+def checkDuplicateSystem(system: bdc.System, cursor: sqlite3.Cursor)->bool:
     cursor.execute("SELECT SystemName FROM Systems WHERE SystemName=?", (system.name,))
     matches = cursor.fetchall()
     return len(matches) > 0
@@ -64,7 +64,7 @@ def checkDuplicateGame(sha256: str, cursor: sqlite3.Cursor)->bool:
     matches = cursor.fetchall()
     return len(matches) > 0
  
-def insertSystem(system: rdc.System, cursor: sqlite3.Cursor)->None:
+def insertSystem(system: bdc.System, cursor: sqlite3.Cursor)->None:
     # Does not check if the system is a duplicate.
 
     # Determine insertion index
@@ -74,7 +74,7 @@ def insertSystem(system: rdc.System, cursor: sqlite3.Cursor)->None:
 
     cursor.execute("INSERT INTO Systems (SystemID, SystemName) Values (?, ?)", (sysIndex, system.name,))
 
-def insertGame(game: rdc.Game, systemIndex: int, cursor: sqlite3.Cursor)->None:
+def insertGame(game: bdc.Game, systemIndex: int, cursor: sqlite3.Cursor)->None:
     # Does not check if the game is a duplicate.
 
     # Determine insertion index
@@ -86,8 +86,7 @@ def insertGame(game: rdc.Game, systemIndex: int, cursor: sqlite3.Cursor)->None:
                    (gameIndex, systemIndex, game.filename, game.name, game.path, game.sha256, game.publisher, game.release_year,)
             )
 
-def getSystemIndex(system: rdc.System, cursor: sqlite3.Cursor)->int:
+def getSystemIndex(system: bdc.System, cursor: sqlite3.Cursor)->int:
     cursor.execute("SELECT SystemID FROM Systems WHERE SystemName=?", (system.name,))
     matches = cursor.fetchone()
     return matches[0]
-

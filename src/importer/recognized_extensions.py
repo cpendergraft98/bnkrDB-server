@@ -1,3 +1,5 @@
+# TODO: turn this into: "if the system can't figure out the extension any other way, check here"
+
 RECOGNIZED_EXTENSIONS = {
     ".gb": "Game Boy",
     ".gbc": "Game Boy Color",
@@ -35,6 +37,5 @@ RECOGNIZED_EXTENSIONS = {
     ".rvz": "variable", 
     ".gcz": "variable", 
     ".iso": "variable", 
-    ".chd": "variable" 
-    
+    ".chd": "variable"    
 }
