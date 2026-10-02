@@ -6,69 +6,9 @@ import sqlite3
 from recognized_extensions import RECOGNIZED_EXTENSIONS
 from dotenv import load_dotenv
 import os
+import db_ops
 
 load_dotenv() #load environment variables
-
-def buildDatabase(cursor: sqlite3.Cursor)->None:
-    # build database in-placE
-
-    # user table
-    cursor.execute("""
-        CREATE TABLE Users(
-            UserID INTEGER PRIMARY KEY,
-            UserName TEXT UNIQUE,
-            PasswdHash TEXT NOT NULL
-        )
-    """)
-
-    # system table
-    cursor.execute("""
-        CREATE TABLE Systems(
-            SystemID INTEGER PRIMARY KEY,
-            SystemName TEXT UNIQUE,
-            Manufacturer TEXT,
-            SysRlsYr TEXT
-        )
-    """)
-
-    # game table
-    cursor.execute("""
-        CREATE TABLE Games(
-            GameID INTEGER PRIMARY KEY,
-            SystemID INTEGER,
-            Filename TEXT NOT NULL,
-            GameName TEXT NOT NULL,
-            Path TEXT NOT NULL,
-            SHA256 TEXT UNIQUE,
-            Publisher TEXT,
-            GameRlsYr TEXT,
-            CONSTRAINT fk_Systems
-            FOREIGN KEY (SystemID)
-            REFERENCES Systems(SystemID)
-        )
-    """)
-
-    # favorites table
-    cursor.execute("""
-        CREATE TABLE Favorites(
-            UserID INTEGER,
-            GameID INTEGER,
-            CONSTRAINT fk_Users
-            FOREIGN KEY (UserID)
-            REFERENCES Users(UserID)
-            CONSTRAINT fk_Games
-            FOREIGN KEY (GameID)
-            REFERENCES Games(GameID)
-        )
-    """)
-
-def checkForDuplicateGame(gameHash: str, cursor: sqlite3.Cursor)-> bool:
-    # Extract existing hashes from game table
-    cursor.execute("SELECT SHA256 FROM Games")
-    fetched = cursor.fetchall()
-    hashes = [fetched[i][0] for i in range(len(fetched))] # list of existing hashes
-
-    return (gameHash) in hashes
 
 def romImporter(romDirectoryPath: str)->None:
     print("Starting scanner...")
@@ -83,7 +23,7 @@ def romImporter(romDirectoryPath: str)->None:
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
 
     if cursor.fetchone() is None: # first-time creation of the db
-        buildDatabase(cursor)
+        db_ops.buildDatabase(cursor)
 
     for file in roms_directory.rglob('*'): # recursively search provided directory
         extension = file.suffix
@@ -102,7 +42,7 @@ def romImporter(romDirectoryPath: str)->None:
                         sha1.update(chunk)
 
                 hash256 = sha256.hexdigest()
-                if not checkForDuplicateGame(hash256, cursor): # check for duplicate game
+                if not db_ops.checkDuplicateGame(hash256, cursor): # check for duplicate game
                     hash1 = sha1.hexdigest()
 
                     metadata = hasheousSearch(hash1)
@@ -110,35 +50,35 @@ def romImporter(romDirectoryPath: str)->None:
                     # if metadata is nonetype then Hasheous returned 404
                     if metadata != None:
 
-                        # Game entry data
-                        cursor.execute("SELECT * FROM Games") #determines ID
-                        gameIndex = len(cursor.fetchall())
-                        filename = file.name
-                        gameName = metadata['name']
-                        publisher = metadata['publisher']
-                        rlsYr = metadata['release_year']
+                        system = rdc.System(
+                            name=RECOGNIZED_EXTENSIONS[extension],
+                            #manufacturer=,
+                            #releaseYear=,
+                        )
 
-                        #TODO: Create a function to check for duplicates in game table based off SHA256
+                        game = rdc.Game(
+                            filename=file.name,
+                            name=metadata['name'],
+                            publisher=metadata['publisher'],
+                            release_year=metadata['release_year'],
+                            path=str(file),
+                            sha256=hash256
+                        )
 
-                        # system entry data
-                        cursor.execute('SELECT SystemName FROM Systems') #determines ID
-                        existing_names = cursor.fetchall()
-                        sysIndex = len(existing_names)
-                        systemName = RECOGNIZED_EXTENSIONS[extension]
-                        systemNameTuple = (systemName,) # existing_names stores Tuples
+                        # check for duplicate system
+                        if not db_ops.checkDuplicateSystem(system, cursor):
+                            db_ops.insertSystem(system, cursor) # insert if duplicate not found
 
-                        if systemNameTuple not in existing_names: # System hasn't been entered into database
-                            cursor.execute("INSERT INTO Systems (SystemID, SystemName) Values(?, ?)", (sysIndex, systemName,))
-                        else: # System exists in database, extract id for game entry
-                            cursor.execute("SELECT SystemID FROM Systems WHERE SystemName=(?)", (systemName,))
-                            sysIndex = cursor.fetchone()[0] # fetchone returns a tuple, extract the index
+                        # determine system index
+                        sysIndex = db_ops.getSystemIndex(system, cursor)
 
-                        cursor.execute("INSERT INTO Games (GameId, SystemId, Filename, GameName, Path, SHA256, Publisher, GameRlsYr) VALUES(?, ?, ?, ?, ?, ?, ?, ?)""",
-                                    (gameIndex, sysIndex, filename, gameName, str(file), hash256, publisher, rlsYr,)
-                            )
-                        connection.commit()
+                        #insert the game
+                        db_ops.insertGame(game, sysIndex, cursor)
+
                 else:
                     print("Duplicate game identified. Skipping....")
+
+    connection.commit()
     connection.close()
 
 if __name__ == "__main__":
